@@ -1,0 +1,19 @@
+[package]
+name = "dora"
+version = "1.0.0"
+edition = "2024"
+authors = ["p1tsi <pitsistip@gmail.com>"]
+description = "A macOS explorer"
+repository = "https://github.com/p1tsi/dora"
+
+[[bin]]
+name = "dora"
+path = "src/main.rs"
+
+
+[dependencies]
+axum = "0.8.4"
+plist = "1.5"
+rusqlite = "0.37.0"
+serde_json = "1.0"
+tokio = { version = "1.47.1", features = ["full"] }
