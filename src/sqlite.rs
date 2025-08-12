@@ -1,8 +1,7 @@
+use rusqlite::Connection;
+use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::fs::File;
-use rusqlite::Connection;
-
 
 // Function to create a SQLite database from its file name and SQL queries
 // This function takes a filename and a string containing SQL queries

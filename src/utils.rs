@@ -1,11 +1,12 @@
+use plist::Value;
+use serde_json::Value as JsonValue;
 use std::fs::File;
 use std::path::Path;
-use serde_json::Value as JsonValue;
-use plist::Value;
 
-
-//Function that takes a path as input and parse the plist file
-pub fn parse_service_plist<P: AsRef<Path>>(path: P) -> Result<JsonValue, Box<dyn std::error::Error>> {
+// Function that takes a path as input and parse the plist file
+pub fn parse_service_plist<P: AsRef<Path>>(
+    path: P,
+) -> Result<JsonValue, Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let plist_value = Value::from_reader(file)?;
     let json = serde_json::to_value(plist_value)?;

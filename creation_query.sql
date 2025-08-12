@@ -80,4 +80,4 @@ CREATE TABLE IF NOT EXISTS service_symbol (
     PRIMARY KEY (service_id, symbol_id),
     FOREIGN KEY (service_id) REFERENCES service(id),
     FOREIGN KEY (symbol_id) REFERENCES symbol(id)
-);  
+);

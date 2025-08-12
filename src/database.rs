@@ -1,10 +1,12 @@
 use serde_json::Value as JsonValue;
+//use std::fs::File;
+//use std::io::Read;
 
-use crate::utils::parse_service_plist;
-use crate::sqlite::{create_db, read_sql_queries_from_file};
 use crate::sqlite::insert_and_get_id;
+use crate::sqlite::{create_db, read_sql_queries_from_file};
+use crate::utils::parse_service_plist;
 
-
+use crate::consts::*;
 
 // Get macho binary entitlements launching "codesign" command
 fn get_macho_entitlements(binary_path: &str) -> Result<JsonValue, Box<dyn std::error::Error>> {
@@ -65,7 +67,6 @@ fn get_macho_entitlements(binary_path: &str) -> Result<JsonValue, Box<dyn std::e
     Ok(entitlements_json)
 }
 
-
 // Function that takes service id, JSON formatted entitlements and saves them
 // to "entitlement" table in SQLite database and "service_entitlement" table to link entitlements with services
 fn save_service_entitlements(
@@ -99,7 +100,7 @@ fn save_service_entitlements(
 
             // Insert the service entitlement into the service_entitlement table
             conn.execute(
-                "INSERT OR IGNORE INTO service_entitlement (service_id, entitlement_id, value) VALUES (?1, ?2, ?3)",
+                INSERT_SERVICE_ENTITLEMENT,
                 rusqlite::params![service_id, entitlement_id, value_str.as_str()],
             )?;
         }
@@ -108,16 +109,12 @@ fn save_service_entitlements(
     Ok(())
 }
 
-
 // Function that takes the parsed JSON for a plist file and saves it to a SQLite database
 fn save_service(
     plist_path: &String,
     json: &JsonValue,
     conn: &rusqlite::Connection,
 ) -> Result<i64, Box<dyn std::error::Error>> {
-    // Insert the JSON data into service table
-    let sql: &'static str = "INSERT OR IGNORE INTO service (label, path, run_as_user, run_at_load, keep_alive, plist_path) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
-
     // Extract values from the JSON object
     let label: &str = json.get("Label").and_then(JsonValue::as_str).unwrap_or("");
     let mut path: &str = json
@@ -154,7 +151,7 @@ fn save_service(
 
     // Execute the SQL statement to insert the service data
     conn.execute(
-        sql,
+        INSERT_SERVICE,
         rusqlite::params![
             label,
             path,
@@ -176,23 +173,21 @@ fn save_mach_services(
     json: &JsonValue,
     conn: &rusqlite::Connection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Insert the JSON data into mach_service table
-    let sql: &'static str =
-        "INSERT OR IGNORE INTO mach_service (name, value, service_id) VALUES (?1, ?2, ?3)";
-
     // Iterate over the JSON object and insert each mach service
     if let Some(mach_services) = json.get("MachServices") {
         if let JsonValue::Object(services) = mach_services {
             for (name, value) in services {
                 let value_str: &str = value.as_str().unwrap_or("");
-                conn.execute(sql, rusqlite::params![name, value_str, service_id])?;
+                conn.execute(
+                    INSERT_MACH_SERVICE,
+                    rusqlite::params![name, value_str, service_id],
+                )?;
             }
         }
     }
 
     Ok(())
 }
-
 
 // Function that extracts external dependencies from a Mach-O binary
 // launching "otool -L <binary_path>" command
@@ -240,10 +235,7 @@ fn save_services_dependencies(
             insert_and_get_id("library", &["name", "path"], &[&library_name, &dep], conn)?;
 
         // Insert the relationship between the mach service and the library
-        conn.execute(
-            "INSERT OR IGNORE INTO service_library (service_id, library_id) VALUES (?1, ?2)",
-            rusqlite::params![service_id, library_id],
-        )?;
+        conn.execute(INSERT_LIBRARY, rusqlite::params![service_id, library_id])?;
     }
 
     Ok(())
@@ -289,10 +281,7 @@ fn save_binary_imported_symbols(
         let symbol_id: i64 = insert_and_get_id("symbol", &["name"], &[&symbol], conn)?;
 
         // Insert the relationship between the service and the symbol
-        conn.execute(
-            "INSERT OR IGNORE INTO service_symbol (service_id, symbol_id) VALUES (?1, ?2)",
-            rusqlite::params![service_id, symbol_id],
-        )?;
+        conn.execute(INSERT_SYMBOL, rusqlite::params![service_id, symbol_id])?;
     }
 
     Ok(())
@@ -411,6 +400,104 @@ pub fn populate_db(sqlite_filename: &String) -> Result<(), Box<dyn std::error::E
             }
         });
     });
+
+    // Iterate over all mach-o binaries under /System/Library/PrivateFrameworks
+    // and all of its subdirectories
+    /*let private_frameworks_path = "/System/Library/PrivateFrameworks";
+    let private_frameworks_entries = std::fs::read_dir(private_frameworks_path)
+        .expect("Failed to read PrivateFrameworks directory");
+    private_frameworks_entries.for_each(|entry| {
+        let entry = entry.expect("Failed to read entry");
+        let path = entry.path();
+        if path.is_dir() {
+            // Recursively process the directory
+            if let Err(e) = std::fs::read_dir(&path).and_then(|entries| {
+                entries.for_each(|entry| {
+                    let entry = entry.expect("Failed to read entry");
+                    let file_path = entry.path();
+
+                    if file_path.is_file() {
+                        // Read the first 4 bytes of the file to check for Mach-O magic numbers
+                        let mut file = File::open(&file_path).unwrap();
+
+                        // Buffer for the first 4 bytes (adjust size if needed)
+                        let mut magic_bytes = [0u8; 4];
+
+                        // Read bytes into the buffer
+                        file.read_exact(&mut magic_bytes).unwrap();
+
+                        if &magic_bytes == b"\xFE\xED\xFA\xCE"
+                            || &magic_bytes == b"\xFE\xED\xFA\xCF"
+                            || &magic_bytes == b"\xCE\xFA\xED\xFE"
+                            || &magic_bytes == b"\xCF\xFA\xED\xFE"
+                            || &magic_bytes == b"\xCA\xFE\xBA\xBE"
+                            || &magic_bytes == b"\xBE\xBA\xFE\xCA"
+                        {
+                            // Process the Mach-O binary
+                            println!("Processing Mach-O binary: {:?}", file_path);
+
+                            let codesign_output = std::process::Command::new("codesign")
+                                .args(["-d", "--entitlements", ":-", file_path.to_str().unwrap()])
+                                .output()
+                                .expect("Failed to execute codesign");
+
+                            println!("Codesign output: {:?}", codesign_output);
+
+                            match get_macho_entitlements(file_path.to_str().unwrap()) {
+                                Ok(entitlements_json) => {
+                                    let service_id: i64 = insert_and_get_id(
+                                        "service",
+                                        &["label", "path"],
+                                        &[file_path.file_name().unwrap().to_str().unwrap(), file_path.to_str().unwrap()],
+                                        &conn,
+                                    )
+                                    .expect("Failed to insert service data");
+
+                                    save_service_entitlements(service_id, &entitlements_json, &conn)
+                                        .expect("Failed to save service entitlements to database");
+
+                                    // Get external dependencies
+                                    match get_external_dependencies(file_path.to_str().unwrap()) {
+                                        Ok(dependencies) => {
+                                            if !dependencies.is_empty() {
+                                                save_services_dependencies(service_id, dependencies, &conn)
+                                                    .expect("Failed to save services dependencies");
+                                            }
+                                        }
+                                        Err(e) => eprintln!(
+                                            "Failed to get external dependencies for binary {:?}: {}",
+                                            file_path, e
+                                        ),
+                                    }
+
+                                    // Get imported symbols
+                                    match get_binary_imported_symbols(file_path.to_str().unwrap()) {
+                                        Ok(symbols) => {
+                                            if !symbols.is_empty() {
+                                                save_binary_imported_symbols(service_id, symbols, &conn)
+                                                    .expect("Failed to save binary imported symbols");
+                                            }
+                                        }
+                                        Err(e) => eprintln!(
+                                            "Failed to get imported symbols for binary {:?}: {}",
+                                            file_path, e
+                                        ),
+                                    }
+                                }
+                                Err(e) => eprintln!(
+                                    "Failed to get entitlements for binary {:?}: {}",
+                                    file_path, e
+                                ),
+                            }
+                        }
+                    }
+                });
+                Ok(())
+            }) {
+                eprintln!("Error processing directory {:?}: {}", path, e);
+            }
+        }
+    });*/
 
     // Close the SQLite database connection
     conn.close()

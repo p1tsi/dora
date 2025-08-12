@@ -3,18 +3,15 @@ use axum::{
     routing::{get, post},
 };
 
-
+mod consts;
 mod database;
 mod sqlite;
-mod web;
 mod utils;
-mod consts;
+mod web;
 
+use consts::{LISTENING_ADDRESS, LISTENING_PORT};
 use database::populate_db;
 use web::*;
-use consts::{LISTENING_ADDRESS, LISTENING_PORT};
-
-
 
 // Print banner for "dora" tool
 fn print_banner() {
@@ -29,12 +26,14 @@ fn print_banner() {
                      
 "#
     );
-    println!("\tA macOS explorer - v{}", env!("CARGO_PKG_VERSION"));
+    println!(
+        "\tA macOS attack surface explorer - v{}",
+        env!("CARGO_PKG_VERSION")
+    );
     println!("\tAuthor: {}", env!("CARGO_PKG_AUTHORS"));
     println!("\tGitHub: {}", env!("CARGO_PKG_REPOSITORY"));
     println!();
 }
-
 
 // Main function that orchestrates the database creation, plist parsing, and data extraction
 #[tokio::main]
@@ -43,9 +42,6 @@ async fn main() {
 
     // Create sqlite db file name.
     // The file name format is "dora_<product_name>_<product_version>_<build_version>.sqlite"
-    // where product_name is the result of sw_version -productName,
-    // product_version is the result of sw_version -productVersion,
-    // and build_version is the result of sw_version -buildVersion.
 
     // Get product name
     let product_name: String = std::process::Command::new("sw_vers")
@@ -106,7 +102,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/query", post(query));
+        .route("/query", post(query))
+        .route("/service", get(service));
 
     let listener =
         tokio::net::TcpListener::bind(format!("{}:{}", LISTENING_ADDRESS, LISTENING_PORT))

@@ -3,7 +3,7 @@ name = "dora"
 version = "1.0.0"
 edition = "2024"
 authors = ["p1tsi <pitsistip@gmail.com>"]
-description = "A macOS explorer"
+description = "macOS attack surface explorer"
 repository = "https://github.com/p1tsi/dora"
 
 [[bin]]
