@@ -1,7 +1,6 @@
 # dora – macOS Attack Surface Explorer
 
 Ever wondered which macOS system services have specific **entitlements**?  
-Or which services are **code-signed** with a particular entitlement?  
 Or maybe which services **import a certain library or symbol**?
 
 That's exactly what **dora** helps you answer — quickly and efficiently.
