@@ -7,10 +7,10 @@ CREATE TABLE IF NOT EXISTS service (
     id INTEGER PRIMARY KEY,
     label TEXT NOT NULL UNIQUE,
     path TEXT NOT NULL,
-    run_as_user INTEGER,
-    run_at_load INTEGER,
-    keep_alive INTEGER,
-    plist_path TEXT NOT NULL UNIQUE
+    run_as_user TEXT,
+    run_at_load TEXT,
+    keep_alive TEXT, 
+    plist_path TEXT UNIQUE
 );
 
 -- Mach service table --

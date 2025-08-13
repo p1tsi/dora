@@ -30,8 +30,6 @@ pub static LISTENING_PORT: u16 = 8778;
 // SQLite queries
 
 // Insert queries
-pub const INSERT_SERVICE: &str = "INSERT OR IGNORE INTO service (label, path, run_as_user, run_at_load, keep_alive, plist_path) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
-
 pub const INSERT_MACH_SERVICE: &str =
     "INSERT OR IGNORE INTO mach_service (name, value, service_id) VALUES (?1, ?2, ?3)";
 
@@ -43,6 +41,7 @@ pub const INSERT_LIBRARY: &str =
 pub const INSERT_SYMBOL: &str =
     "INSERT OR IGNORE INTO service_symbol (service_id, symbol_id) VALUES (?1, ?2)";
 
+// Select queries
 pub const SERVICES_BY_ENTITLEMENT_AND_SYMBOL: &str = "SELECT DISTINCT s.label, s.path \
      FROM service s \
      JOIN service_entitlement se ON s.id = se.service_id \
